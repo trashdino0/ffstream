@@ -4,6 +4,8 @@ Weekly streaming projections for **fantasy kickers** and **team defenses**.
 
 Most fantasy tools treat kickers and defenses as an afterthought. This project is built around the two positions you actually stream: it trains separate models, uses pregame-only information, and produces a ranked board with floor, ceiling, and boom probability so you can decide who to start this week.
 
+See [learned.md](learned.md) for the full build notes: data sources, leakage rules, model choices, backtest results, what did not work, and transferable lessons for an NFL game-score model.
+
 ```
 Kickers   -> blended statistical + Vegas-implied projection, ranked by stream score
 Defenses  -> regularized regression on matchup, pressure, and game environment
