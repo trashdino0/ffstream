@@ -1,0 +1,44 @@
+{
+  "kicker": {
+    "fg_0_39": 3.0,
+    "fg_40_49": 4.0,
+    "fg_50_59": 5.0,
+    "fg_60_plus": 5.0,
+    "xp": 1.0,
+    "fg_miss": -1.0,
+    "xp_miss": -1.0
+  },
+  "dst": {
+    "sack": 1.0,
+    "interception": 2.0,
+    "fumble_recovery": 2.0,
+    "safety": 2.0,
+    "touchdown": 6.0,
+    "blocked_kick": 2.0,
+    "two_point_return": 2.0,
+    "points_allowed": [
+      [0, 0, 10],
+      [1, 6, 7],
+      [7, 13, 4],
+      [14, 20, 1],
+      [21, 27, 0],
+      [28, 34, -1],
+      [35, 999, -4]
+    ],
+    "yards_allowed": [
+      [0, 99, 5],
+      [100, 199, 3],
+      [200, 299, 2],
+      [300, 399, 0],
+      [400, 449, -1],
+      [450, 499, -3],
+      [500, 999, -5]
+    ]
+  },
+  "streaming": {
+    "kicker_start_threshold": 8.0,
+    "dst_start_threshold": 9.0,
+    "boom_kicker": 10.0,
+    "boom_dst": 12.0
+  }
+}
