@@ -124,8 +124,10 @@ def _schedule_features(df: pd.DataFrame) -> pd.DataFrame:
     )
     total = df["total_line"]
     spread = df["spread_line"]
-    home_implied = total / 2.0 - spread / 2.0
-    away_implied = total / 2.0 + spread / 2.0
+    # nflverse spread_line is from the home team's perspective and positive when
+    # the home team is favored (e.g. -16.5 means the road team is favored).
+    home_implied = total / 2.0 + spread / 2.0
+    away_implied = total / 2.0 - spread / 2.0
     df["team_implied"] = np.where(df["is_home"] == 1, home_implied, away_implied)
     df["opp_implied"] = np.where(df["is_home"] == 1, away_implied, home_implied)
     df["implied_margin"] = df["team_implied"] - df["opp_implied"]

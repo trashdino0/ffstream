@@ -73,6 +73,12 @@ It is a practical cutoff, not a requirement.
 8. **`build` is global.** Running `ffstream build --seasons 2026` overwrites
    the processed tables with only 2026 data and destroys training history.
    Run `ffstream build` with no season filter to rebuild all seasons.
+9. **`weekly_rosters` is a snapshot, not a transaction log.** Each row is a
+   player's status for that week (`ACT`, `CUT`, `DEV`, `RES`, ...), and teams on
+   bye often have no rows at all. Take the latest snapshot at or before the
+   target week, filter to `position == "K"`, and treat `ACT` as the only
+   playable status. Multiple `ACT` kickers mean a real competition; zero means
+   the roster file is behind the news.
 
 ---
 
@@ -120,12 +126,15 @@ $env:PYTHONPATH="src"
 python -m ffstream refresh --seasons 2014-2026
 python -m ffstream build
 python -m ffstream week --season 2026 --week 10 --top 20
+python -m ffstream grade --season 2026 --week 10
 python -m ffstream backtest --seasons 2021-2025
 python -m ffstream train --season 2026 --week 10
+python -m ffstream doctor
 ```
 
 Windows shortcut: double-click `weekly.cmd`. It refreshes the current season,
-rebuilds all seasons, and writes the next board.
+rebuilds all seasons, writes the next board, and auto-grades the most recent
+completed week that has a saved board.
 
 `week` retrains automatically before building the board, so `train` is only
 needed when you explicitly want persisted model artifacts.
@@ -167,11 +176,12 @@ backtest will look great and every live week will disappoint.
 ### Implied totals
 
 With `total_line` and `spread_line` where the spread is from the home team's
-perspective (negative = home favored):
+perspective (**positive = home team favored**, e.g. -16.5 means the road team
+is favored):
 
 ```python
-home_implied = total_line / 2 - spread_line / 2
-away_implied = total_line / 2 + spread_line / 2
+home_implied = total_line / 2 + spread_line / 2
+away_implied = total_line / 2 - spread_line / 2
 ```
 
 Then select the team's own implied total and the opponent's based on `is_home`.
@@ -285,6 +295,13 @@ and makes the review unreadable.
 ---
 
 ## 7. Results
+
+> **Note:** The tables below are the original build-time measurements. A later
+> fix corrected the sign of the implied-total features (nflverse
+> `spread_line` is positive when the home team is favored). Re-running the
+> backtest after that fix gives the same qualitative picture: 2021-2025 kicker
+> Spearman 0.155, DST 0.326; 2026 replay 0.035 / 0.383. See the README snapshot
+> for the current numbers.
 
 ### 2021–2025 walk-forward
 

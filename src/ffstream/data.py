@@ -5,6 +5,7 @@ Sources
 - schedules/games: https://github.com/nflverse/nflverse-data/releases/tag/schedules
 - weekly player stats: https://github.com/nflverse/nflverse-data/releases/tag/stats_player
 - play-by-play: https://github.com/nflverse/nflverse-data/releases/tag/pbp
+- weekly rosters: https://github.com/nflverse/nflverse-data/releases/tag/weekly_rosters
 
 Everything is cached as parquet under ``data/raw``. The project never scrapes
 live sites, so it stays reproducible and does not depend on an API key.
@@ -106,6 +107,18 @@ PLAYER_WEEK_COLUMNS = [
     "gwfg_distance",
 ]
 
+ROSTER_COLUMNS = [
+    "season",
+    "week",
+    "game_type",
+    "team",
+    "position",
+    "depth_chart_position",
+    "status",
+    "full_name",
+    "gsis_id",
+]
+
 
 def _url(kind: str, filename: str) -> str:
     return f"{BASE}/{kind}/{filename}"
@@ -150,16 +163,25 @@ def download_pbp(season: int, force: bool = False) -> Path:
     )
 
 
+def download_weekly_rosters(season: int, force: bool = False) -> Path:
+    return download_file(
+        _url("weekly_rosters", f"roster_weekly_{season}.parquet"),
+        RAW_DIR / f"roster_weekly_{season}.parquet",
+        force,
+    )
+
+
 def download_seasons(
     seasons: Iterable[int], force: bool = False, workers: int = 4
 ) -> None:
-    """Download schedules plus player weeks and PBP for each season."""
+    """Download schedules plus weekly rosters, player weeks, and PBP per season."""
     seasons = sorted(set(int(s) for s in seasons))
     download_games(force=force)
     jobs = []
     for season in seasons:
         jobs.append((download_player_week, season))
         jobs.append((download_pbp, season))
+        jobs.append((download_weekly_rosters, season))
 
     def run(item):
         fn, season = item
@@ -205,6 +227,29 @@ def load_player_weeks(seasons: Iterable[int] | None = None) -> pd.DataFrame:
             frames.append(frame[cols])
     if not frames:
         return pd.DataFrame(columns=PLAYER_WEEK_COLUMNS)
+    out = pd.concat(frames, ignore_index=True)
+    out["season"] = out["season"].astype(int)
+    out["week"] = out["week"].astype(int)
+    return out
+
+
+def load_weekly_rosters(seasons: Iterable[int] | None = None) -> pd.DataFrame:
+    """Weekly roster snapshots, filtered to the columns the board needs."""
+    seasons = sorted(int(s) for s in (seasons or []))
+    frames = []
+    for season in seasons:
+        path = RAW_DIR / f"roster_weekly_{season}.parquet"
+        if not path.exists():
+            try:
+                download_weekly_rosters(season)
+            except requests.HTTPError:
+                continue
+        if path.exists():
+            frame = pd.read_parquet(path)
+            cols = [c for c in ROSTER_COLUMNS if c in frame.columns]
+            frames.append(frame[cols])
+    if not frames:
+        return pd.DataFrame(columns=ROSTER_COLUMNS)
     out = pd.concat(frames, ignore_index=True)
     out["season"] = out["season"].astype(int)
     out["week"] = out["week"].astype(int)

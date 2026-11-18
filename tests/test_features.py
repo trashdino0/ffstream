@@ -304,11 +304,11 @@ def test_vegas_implied_points_split() -> None:
     b_week1 = feats[
         (feats["team"] == "B") & (feats["season"] == 2021) & (feats["week"] == 1)
     ].iloc[0]
-    # total 44, spread -6 => 25 / 19
-    assert a_week1["team_implied"] == pytest.approx(25.0)
-    assert a_week1["opp_implied"] == pytest.approx(19.0)
-    assert b_week1["team_implied"] == pytest.approx(19.0)
-    assert b_week1["implied_margin"] == pytest.approx(-6.0)
+    # total 44, spread -6 => home team A is a 6-point underdog: 19 / 25
+    assert a_week1["team_implied"] == pytest.approx(19.0)
+    assert a_week1["opp_implied"] == pytest.approx(25.0)
+    assert b_week1["team_implied"] == pytest.approx(25.0)
+    assert b_week1["implied_margin"] == pytest.approx(6.0)
 
 
 def _kicker_history() -> pd.DataFrame:

@@ -99,6 +99,31 @@ def test_render_html_contains_both_boards_and_escapes_names() -> None:
     assert "1,000" in html
 
 
+def test_render_html_shows_roster_alerts() -> None:
+    rows = _rows(3)
+    rows["roster_status"] = ["confirmed", "unconfirmed", "replaced"]
+    rows["roster_note"] = ["", "A&B listed as DEV; no active kicker", "Old -> New"]
+    kicker = prepare_table(rows, _pred(3), "kicker_pts", "mean")
+    dst = prepare_table(_rows(3), _pred(3), "dst_pts", "mean")
+
+    html = render_html(kicker, dst, 2026, 11, meta={})
+    assert "Roster checks" in html
+    assert "A&amp;B listed as DEV" in html
+    assert "Old -&gt; New" in html
+    assert html.count("<li>") == 2
+
+
+def test_render_html_hides_roster_panel_when_all_confirmed() -> None:
+    rows = _rows(3)
+    rows["roster_status"] = ["confirmed"] * 3
+    rows["roster_note"] = [""] * 3
+    kicker = prepare_table(rows, _pred(3), "kicker_pts", "mean")
+    dst = prepare_table(_rows(3), _pred(3), "dst_pts", "mean")
+
+    html = render_html(kicker, dst, 2026, 11, meta={})
+    assert "Roster checks" not in html
+
+
 def test_write_weekly_outputs_creates_three_files(tmp_path) -> None:
     kicker = prepare_table(_rows(3), _pred(3), "kicker_pts", "mean")
     dst = prepare_table(_rows(3), _pred(3), "dst_pts", "mean")

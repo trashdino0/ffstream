@@ -112,6 +112,8 @@ def prepare_table(
         "proj_mean",
         "stream_score",
         "player_id",
+        "roster_status",
+        "roster_note",
         "game_id",
         "season",
         "week",
@@ -131,15 +133,60 @@ def _badge_class(tier: str) -> str:
     }.get(tier, "sit")
 
 
+def _roster_badge(row: pd.Series) -> str:
+    status = str(row.get("roster_status", "confirmed") or "confirmed").lower()
+    if status == "confirmed":
+        return ""
+    labels = {
+        "replaced": "ROSTER SWAP",
+        "competition": "COMPETITION",
+        "unconfirmed": "CHECK ROSTER",
+        "unavailable": "NO ROSTER DATA",
+    }
+    label = labels.get(status, status.upper())
+    note = escape(str(row.get("roster_note", "")))
+    return (
+        f"<span class='roster {escape(status)}' title='{note}'>{escape(label)}</span>"
+    )
+
+
+def _roster_alerts(table: pd.DataFrame) -> str:
+    if "roster_status" not in table.columns:
+        return ""
+    status = table["roster_status"].fillna("confirmed").astype(str)
+    flagged = table[status != "confirmed"]
+    if flagged.empty:
+        return ""
+
+    grouped: dict[str, list[str]] = {}
+    for _, row in flagged.sort_values(["roster_status", "rank"]).iterrows():
+        note = str(row.get("roster_note", "") or "needs a lineup check")
+        grouped.setdefault(note, []).append(str(row["player"]))
+
+    items = []
+    for note, players in grouped.items():
+        if len(players) == 1:
+            label = f"<strong>{escape(players[0])}</strong>"
+        else:
+            label = f"<strong>{len(players)} kickers</strong>"
+        items.append(f"<li>{label}: {escape(note)}</li>")
+    return (
+        "<div class='alerts'><div class='alerts-title'>Roster checks</div>"
+        f"<ul>{''.join(items)}</ul></div>"
+    )
+
+
 def _html_table(table: pd.DataFrame, table_id: str) -> str:
     rows = []
-    for _, row in table.head(24).iterrows():
+    for _, row in table.head(32).iterrows():
         tier = escape(str(row["tier"]))
+        roster = _roster_badge(row)
         rows.append(
             "<tr>"
             f"<td class='rank' data-sort='{int(row['rank'])}'>{int(row['rank'])}</td>"
             f"<td class='player'><strong>{escape(str(row['player']))}</strong>"
-            f"<span class='team'>{escape(str(row.get('team', '')))} vs {escape(str(row.get('opponent', '')))}</span></td>"
+            f"<span class='team'>{escape(str(row.get('team', '')))} vs {escape(str(row.get('opponent', '')))}</span>"
+            f"{roster}</td>"
             f"<td data-sort='{row['projected']}'><strong>{_fmt(row['projected'])}</strong></td>"
             f"<td data-sort='{row['floor']}' class='muted'>{_fmt(row['floor'])}</td>"
             f"<td data-sort='{row['ceiling']}' class='muted'>{_fmt(row['ceiling'])}</td>"
@@ -239,6 +286,18 @@ def render_html(
   .badge.spot {{ background:rgba(96,165,250,.14); color:#93c5fd; border:1px solid rgba(96,165,250,.35); }}
   .badge.deep {{ background:rgba(251,191,36,.12); color:#fcd34d; border:1px solid rgba(251,191,36,.3); }}
   .badge.sit {{ background:rgba(251,113,133,.1); color:#fda4af; border:1px solid rgba(251,113,133,.28); }}
+  .roster {{ display:inline-block; margin-top:4px; padding:2px 6px; border-radius:999px;
+    font-size:9px; font-weight:750; letter-spacing:.06em; white-space:nowrap; }}
+  .roster.replaced {{ background:rgba(251,191,36,.15); color:#fcd34d; border:1px solid rgba(251,191,36,.35); }}
+  .roster.competition {{ background:rgba(96,165,250,.14); color:#93c5fd; border:1px solid rgba(96,165,250,.35); }}
+  .roster.unconfirmed {{ background:rgba(251,113,133,.12); color:#fda4af; border:1px solid rgba(251,113,133,.3); }}
+  .roster.unavailable {{ background:rgba(148,163,184,.12); color:#cbd5e1; border:1px solid rgba(148,163,184,.3); }}
+  .alerts {{ margin:0 0 12px; padding:10px 12px; border-radius:10px;
+    background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.28); }}
+  .alerts-title {{ font-size:11px; font-weight:750; letter-spacing:.06em;
+    text-transform:uppercase; color:#fcd34d; margin-bottom:4px; }}
+  .alerts ul {{ margin:0; padding-left:16px; color:#e8eef6; font-size:12px; }}
+  .alerts li {{ margin:2px 0; }}
   .method {{ margin-top:24px; background:var(--panel); border:1px solid var(--line);
     border-radius:16px; padding:20px; }}
   .method p, .method li {{ color:#b6c3d4; font-size:13px; line-height:1.65; }}
@@ -289,6 +348,7 @@ def render_html(
   <section class="grid">
     <div class="panel">
       <div class="panel-head"><h2>Kickers</h2><span class="hint">ranked by stream score</span></div>
+      {_roster_alerts(kicker)}
       <div class="table-wrap">{_html_table(kicker, "kicker-table")}</div>
     </div>
     <div class="panel">
@@ -302,8 +362,8 @@ def render_html(
     <p><strong>Kickers.</strong> The model uses Vegas implied team total and game script, the kicker's recent attempts and accuracy, team red-zone touchdown rate (more TDs means fewer field goals), opponent field-goal attempts allowed, dome/weather, rest, and recent scoring. The final projection blends the statistical model with a market-implied baseline so early-season or thin-history kickers do not drift too far from the game line.</p>
     <p><strong>Defenses.</strong> The model uses the opponent's implied total, offensive EPA, sack and turnover rates, red-zone efficiency, pace, the defense's own pressure/takeaway form, and game environment. Streaming defenses are driven by pressure and turnover upside as much as by points allowed.</p>
     <p><strong>Reading the columns.</strong> <code>Floor</code> and <code>Ceiling</code> are the 10th and 90th percentile outcomes. <code>Boom</code> is the estimated probability of a start-worthy week (kicker ≥ 10, defense ≥ 12). For kickers, the board is ordered by a stream score that gives a small tilt to ceiling; use <code>Proj</code> if you want pure expected points.</p>
-    <p><strong>Data.</strong> nflverse play-by-play, weekly player stats, schedules, closing spreads/totals, rest, roof, surface, temperature, and wind. Every rolling feature is shifted one game, so the model only sees information available before kickoff.</p>
-    <p class="foot">Injury news, late kicker changes, and inactive lists are not yet ingested. Check those before locking a lineup. Kicker scoring is inherently high variance; treat the projections as a ranking aid, not a guarantee. {escape(notes)}</p>
+    <p><strong>Data.</strong> nflverse play-by-play, weekly player stats, schedules, weekly rosters, closing spreads/totals, rest, roof, surface, temperature, and wind. Every rolling feature is shifted one game, so the model only sees information available before kickoff.</p>
+    <p class="foot">Kicker names are checked against the nflverse weekly roster snapshot; a <code>ROSTER SWAP</code>, <code>COMPETITION</code>, or <code>CHECK ROSTER</code> badge means the lineup needs a manual check. Game-day inactives and injury reports are still not ingested. Kicker scoring is inherently high variance; treat the projections as a ranking aid, not a guarantee. {escape(notes)}</p>
   </section>
 </div>
 
